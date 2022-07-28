@@ -8,23 +8,23 @@ def chars_to_string(chars):
 
 def make_node(g, i, name, phase=False):
     if phase:
-        fname = chars_to_string(g['fit_type_phase'][()])
-        coefs = g['fitparams_phase'][()][i]
+        fname = chars_to_string(g['fit_type_phase'].value)
+        coefs = g['fitparams_phase'].value[i]
     else:
-        fname = chars_to_string(g['fit_type_amp'][()])
-        coefs = g['fitparams_amp'][()][i]
+        fname = chars_to_string(g['fit_type_amp'].value)
+        coefs = g['fitparams_amp'].value[i]
     node = nodeFunction.MappedPolyFit1D_q10_q_to_nu(function_name=fname, coefs=coefs)
     nf = nodeFunction.NodeFunction(name=name, node_function=node)
     return nf
 
 def get_mode_surrogate_data(g, name):
-    B = g['B'][()].T
-    B_phase = g['B_phase'][()].T
+    B = g['B'].value.T
+    B_phase = g['B_phase'].value.T
     nodes = []
-    for i in range(len(g['fitparams_amp'][()])):
+    for i in range(len(g['fitparams_amp'].value)):
         nodes.append(make_node(g, i, '%s_amp_node_%s'%(name, i)))
     phase_nodes = []
-    for i in range(len(g['fitparams_phase'][()])):
+    for i in range(len(g['fitparams_phase'].value)):
         phase_nodes.append(make_node(g, i, '%s_phase_node_%s'%(name, i), True))
     return {'amp': (B, nodes), 'phase': (B_phase, phase_nodes)}
 

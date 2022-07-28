@@ -327,16 +327,15 @@ class H5Surrogate(SurrogateBaseIO):
       # Get keys in the given subdirectory
       self.keys = list(self.file[subdir[:-1]].keys())
       
-    ### Get surrogateID ####
+    ### Get SurrogateID ####
     name = self.file.filename.split('/')[-1].split('.')[0]
     if self._surrogate_ID_h5 in self.keys:
       self.surrogateID = self.chars_to_string(self.file[subdir+self._surrogate_ID_h5][()])
       if self.surrogateID != name:
-        print("\n>>> Warning: surrogateID does not have expected name.")
+        print("\n>>> Warning: SurrogateID does not have expected name.")
     else:
       surrogateID = get_modelID_from_filename(file.filename)
       if len(surrogateID) == 0 or len(surrogateID) > 1:
-        self.surrogateID = None
         print("\n>>> Warning: No surrogate ID found. Could not deduce ID from file")
       else:
         self.surrogateID = surrogateID[0]
@@ -418,7 +417,7 @@ class H5Surrogate(SurrogateBaseIO):
       self.B = self.file[subdir+self._B_h5][:]	
     else:
       raise ValueError('invalid surrogate type')
-
+    
     ### Information about phase/amp parametric fit ###
     if self._affine_map_h5 in self.keys:
       self.affine_map = self.chars_to_string(self.file[subdir+self._affine_map_h5][()])
@@ -482,7 +481,7 @@ class H5Surrogate(SurrogateBaseIO):
       num_fits = self.fitparams_amp.shape[0]
       fitparams_amp = []
       fitparams_phase = []
-      degree = int(self.file[subdir+'degree'][:]) # must be int for scipy (> 1.5.2) splev to work
+      degree = self.file[subdir+'degree'][:]
       for i in range(num_fits):
         fitparams_amp.append([spline_knots, self.fitparams_amp[i,:], degree])
         fitparams_phase.append([spline_knots, self.fitparams_phase[i,:], degree])
@@ -558,31 +557,6 @@ class H5Surrogate(SurrogateBaseIO):
     
     if closeQ:
       self.file.close()
-
-
-
-    ### check that data has been loaded as 64-bit double (NOTE: not all datasets are checked here)
-    ### Why is this important? It was found that using np.float32 can lead to problems,
-    ### for example when trying to comput flow, which is sensitive to small changes, round-off
-    ### errors can give wildly incorrect values (off by ~10%)
-    if not isinstance(self.times[0], np.float64):
-      print("Time grid loaded with data type %s. Changing to float64..."%type(self.times[0]))
-      self.times = np.array(self.times, dtype=np.float64)
-      self.tmin = self.times[0]
-      self.tmax = self.times[-1]
-    if self.surrogate_mode_type == 'amp_phase_basis':
-      if not isinstance(self.B_1[0][0], np.float64):
-        print("Basis matrix loaded with data type %s. Changing to float64..."%type(self.B_1[0][0]))
-        self.B_1 = np.array(self.B_1, dtype=np.float64)
-        self.B_2 = np.array(self.B_2, dtype=np.float64)
-    elif self.surrogate_mode_type  == 'waveform_basis':
-      if not isinstance(np.real(self.B[0][0]), np.float64):
-        print("Basis matrix loaded with data type %s. Should change to float64...BUT NOT CODED YET!!!"%type(self.B_1[0][0]))
-    if self.fit_type_amp == "spline_1d" and self.fit_type_phase == "spline_1d":
-      if not isinstance(self.fitparams_amp[0][0][0], np.float64):
-        print("Fit parameters loaded with data type %s. This is probably OK. NOT changing to float64..."%type(self.fitparams_amp[0][0][0]))
-    #    self.fitparams_amp = np.array(self.fitparams_amp, dtype=np.float64)
-    #    self.fitparams_phase = np.array(self.fitparams_phase, dtype=np.float64)
     
     pass
     
@@ -680,7 +654,7 @@ class TextSurrogateRead(SurrogateBaseIO):
     surrogate_load_info = '' # add to string, display after loading
 
     ### sdir is defined to be the surrogate's ID ###
-    self.surrogateID = sdir
+    self.SurrogateID = sdir
 
     ### type of surrogate (for harmonic mode) ###
     self.surrogate_mode_type = \
@@ -844,7 +818,7 @@ class TextSurrogateWrite(SurrogateBaseIO):
       print("Could not create a surrogate directory. Not ready to export, please try again.")
 
     ### sdir is defined to be the surrogate's ID ###
-    self.surrogateID = sdir
+    self.SurrogateID = sdir
 
 
   #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -860,37 +834,37 @@ class TextSurrogateWrite(SurrogateBaseIO):
     # TODO: flag to zip folder and save full time series
 
     ### pack mass ratio interval (for fits) and time info ###
-    self._np_savetxt_safe(self.surrogateID+self._fit_interval_txt,fit_interval)
-    self._np_savetxt_safe(self.surrogateID+self._time_info_txt,time_info)
-    self._np_savetxt_safe(self.surrogateID+self._greedy_points_txt,\
+    self._np_savetxt_safe(self.SurrogateID+self._fit_interval_txt,fit_interval)
+    self._np_savetxt_safe(self.SurrogateID+self._time_info_txt,time_info)
+    self._np_savetxt_safe(self.SurrogateID+self._greedy_points_txt,\
                          greedy_points,fmt='%2.16f')
-    self._np_savetxt_safe(self.surrogateID+self._eim_indices_txt,\
+    self._np_savetxt_safe(self.SurrogateID+self._eim_indices_txt,\
                          eim_indices,fmt='%i')
-    self._np_savetxt_safe(self.surrogateID+self._B_1_txt,B.real)
-    self._np_savetxt_safe(self.surrogateID+self._B_2_txt,B.imag)
-    self._np_savetxt_safe(self.surrogateID+self._fitparams_phase_txt,\
+    self._np_savetxt_safe(self.SurrogateID+self._B_1_txt,B.real)
+    self._np_savetxt_safe(self.SurrogateID+self._B_2_txt,B.imag)
+    self._np_savetxt_safe(self.SurrogateID+self._fitparams_phase_txt,\
                          fitparams_phase)
-    self._np_savetxt_safe(self.surrogateID+self._fitparams_amp_txt,\
+    self._np_savetxt_safe(self.SurrogateID+self._fitparams_amp_txt,\
                          fitparams_amp)
-    #self._np_savetxt_safe(self.surrogateID+self._affine_map_txt,\
+    #self._np_savetxt_safe(self.SurrogateID+self._affine_map_txt,\
     #                     np.array([int(affine_map)]),fmt='%i')
-    self._np_savetxt_safe(self.surrogateID+self._affine_map_txt,\
+    self._np_savetxt_safe(self.SurrogateID+self._affine_map_txt,\
                          [affine_map],'%s')
-    self._np_savetxt_safe(self.surrogateID+self._V_1_txt,V.real)
-    self._np_savetxt_safe(self.surrogateID+self._V_2_txt,V.imag)
-    self._np_savetxt_safe(self.surrogateID+self._R_1_txt,R.real)
-    self._np_savetxt_safe(self.surrogateID+self._R_2_txt,R.imag)
-    self._np_savetxt_safe(self.surrogateID+self._fitparams_norm_txt,\
+    self._np_savetxt_safe(self.SurrogateID+self._V_1_txt,V.real)
+    self._np_savetxt_safe(self.SurrogateID+self._V_2_txt,V.imag)
+    self._np_savetxt_safe(self.SurrogateID+self._R_1_txt,R.real)
+    self._np_savetxt_safe(self.SurrogateID+self._R_2_txt,R.imag)
+    self._np_savetxt_safe(self.SurrogateID+self._fitparams_norm_txt,\
                          fitparams_norm)
-    self._np_savetxt_safe(self.surrogateID+self._fit_type_phase_txt,\
+    self._np_savetxt_safe(self.SurrogateID+self._fit_type_phase_txt,\
                          [fit_type_phase],'%s')
-    self._np_savetxt_safe(self.surrogateID+self._fit_type_amp_txt,\
+    self._np_savetxt_safe(self.SurrogateID+self._fit_type_amp_txt,\
                          [fit_type_amp],'%s')
-    self._np_savetxt_safe(self.surrogateID+self._fit_type_norm_txt,\
+    self._np_savetxt_safe(self.SurrogateID+self._fit_type_norm_txt,\
                          [fit_type_norm],'%s')
-    self._np_savetxt_safe(self.surrogateID+self._parameterization_txt,\
+    self._np_savetxt_safe(self.SurrogateID+self._parameterization_txt,\
                          [parameterization],'%s')
-    self._np_savetxt_safe(self.surrogateID+self._surrogate_mode_type_txt,\
+    self._np_savetxt_safe(self.SurrogateID+self._surrogate_mode_type_txt,\
                          [surrogate_mode_type],'%s')
 
   #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

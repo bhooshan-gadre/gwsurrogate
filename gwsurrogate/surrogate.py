@@ -6,7 +6,7 @@ __copyright__ = "Copyright (C) 2014 Scott Field and Chad Galley"
 __email__     = "sfield@umassd.edu, crgalley@tapir.caltech.edu"
 __status__    = "testing"
 __author__    = "Jonathan Blackman, Scott Field, Chad Galley, Vijay Varma, Kevin Barkett"
-__version__ = "1.1.0"
+__version__ = "1.0.1"
 __license__ = """
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -194,13 +194,13 @@ class EvaluateSingleModeSurrogate(_H5Surrogate, _TextSurrogateRead):
     if (times is not None):
       t = times
     else:
-      t = self.time() # shallow copy of self.times
+      t = self.time()
       if self.surrogateID == 'EMRISur1dq1e4':
-        t = t * alpha_emri # this will deep copy, preserving data in self.times
+        t = t * alpha_emri
 
     ### if input times are dimensionless, convert to MKS if a physical surrogate is requested ###
     if units == 'dimensionless':
-      t = t_scale * t  # this will deep copy, preserving data in self.times
+      t = t_scale * t
 
     # because times is passed to _h_sur, it must be dimensionless form t/M
     if times is not None and units == 'mks':
@@ -1539,7 +1539,7 @@ class SurrogateEvaluator(object):
         mode_list=None, ellMax=None, inclination=None, phi_ref=0,
         precessing_opts=None, tidal_opts=None, par_dict=None,
         units='dimensionless', skip_param_checks=False,
-        taper_end_duration=None):
+        taper_end_duration=None, return_coorb=False):
         """
     INPUT
     =====
@@ -1703,7 +1703,7 @@ class SurrogateEvaluator(object):
                 Skip sanity checks for inputs. Use this if you want to
                 extrapolate outside allowed range. Default: False.
 
-    taper_end_duration:
+    taper_end_durataion:
                 Taper the last TAPER_END_DURATION (M) of a time-domain waveform
                 in units of M. For exmple, passing 40 will taper the last 40M.
                 When set to None, no taper is applied
@@ -1726,13 +1726,13 @@ class SurrogateEvaluator(object):
 
     h :         The waveform.
                     If inclination is specified, the complex strain (h = hplus
-                    -i hcross) evaluated at (inclination, pi/2 - phi_ref) on
-                    the sky of the reference frame is returned. This follows
-                    the LAL convention, see below for details.  This includes
-                    all modes given in the ellMax/mode_list argument. For
-                    nonprecessing systems the m<0 modes are automatically
-                    deduced from the m>0 modes. To see if a model is precessing
-                    check self.keywords.
+                    -i hcross) evaluated at (inclination, pi/2) on the sky of
+                    the reference frame is returned. This follows the LAL
+                    convention, see below for details.  This includes all modes
+                    given in the ellMax/mode_list argument. For nonprecessing
+                    systems the m<0 modes are automatically deduced from the
+                    m>0 modes. To see if a model is precessing check
+                    self.keywords.
 
                     Else, h is a dictionary of available modes with (l, m)
                     tuples as keys. For example, h22 = h[(2,2)].
@@ -1859,17 +1859,25 @@ class SurrogateEvaluator(object):
         # Get waveform modes and domain in dimensionless units
         fM_low = f_low*t_scale
         fM_ref = f_ref*t_scale
-        domain, h, dynamics = self._sur_dimless(x, fM_low=fM_low,
+
+        if return_coorb:
+            domain, h, dynamics, h_c = self._sur_dimless(x, fM_low=fM_low,
             fM_ref=fM_ref, dtM=dtM, timesM=timesM, dfM=dfM,
             freqsM=freqsM, mode_list=mode_list, ellMax=ellMax,
             precessing_opts=precessing_opts, tidal_opts=tidal_opts,
-            par_dict=par_dict)
+            par_dict=par_dict, return_coorb=True)
+        else:
+            domain, h, dynamics = self._sur_dimless(x, fM_low=fM_low,
+                fM_ref=fM_ref, dtM=dtM, timesM=timesM, dfM=dfM,
+                freqsM=freqsM, mode_list=mode_list, ellMax=ellMax,
+                precessing_opts=precessing_opts, tidal_opts=tidal_opts,
+                par_dict=par_dict)
 
         # taper the last portion of the waveform, regardless of whether or not
         # this corresponds to inspiral, merger, or ringdown.
         if taper_end_duration is not None:
             h_tapered = {}
-            for mode, hlm in h.items():
+            for mode, hlm in h.iteritems():
                 # NOTE: we use a roll on window [domain[0]-100, domain[0]-50]
                 # to trick the window function into not tapering the beginning
                 # of h
@@ -1915,7 +1923,11 @@ class SurrogateEvaluator(object):
             else:
                 h *= amp_scale
 
-        return domain, h, dynamics
+        if return_coorb:
+            ## Remeber, coorbital modes are dimentionless!
+            return domain, h, dynamics, h_c
+        else:
+            return domain, h, dynamics
 
 
 
@@ -1945,7 +1957,8 @@ in the above range and has been tested against existing NR waveforms in that
 range.
 
 See the __call__ method on how to evaluate waveforms.
-   """
+In the __call__ method, x must have format x = [q, chi1z, chi2z].
+    """
 
     def __init__(self, h5filename):
         self.h5filename = h5filename
@@ -2022,6 +2035,7 @@ problematic behavior in the waveform at late times as the spin-tidal
 crossterms grow significant. This is future work.
 
 See the __call__ method on how to evaluate waveforms.
+In the __call__ method, x must have format x = [q, chi1z, chi2z].
     """
 
     def __init__(self, h5filename):
@@ -2078,78 +2092,6 @@ See the __call__ method on how to evaluate waveforms.
         return x
 
 
-class NRHybSur2dq15(SurrogateEvaluator):
-    """
-A class for the NRHybSur2dq15 surrogate model presented in
-arxiv:2203.10109. 
-
-Evaluates gravitational waveforms generated by aligned-spin binary black hole
-systems. This model was built using numerical relativity (NR) waveforms that
-have been hybridized using effective one body (EOB) waveforms.
-
-This model includes the following spin-weighted spherical harmonic modes:
-(2,2), (2,1), (3,3), (4,4) and (5,5).
-The m<0 modes are deduced from the m>0 modes.
-
-The parameter space of validity is:
-q \in [1, 20], |chi1z| \in [-0.7, 0.7], chi2z = 0.
-where q is the mass ratio and chi1z/chi2z are the spins of the
-heavier/lighter BH, respectively, in in the direction of orbital angular momentum.
-
-The surrogate has been trained in the range
-q \in [1, 15] and chi1z \in [-0.5, 0.5] chi2z = 0, but produces reasonable
-waveforms in the above range. 
-
-See the __call__ method on how to evaluate waveforms.
-    """
-
-    def __init__(self, h5filename):
-        self.h5filename = h5filename
-        domain_type = 'Time'
-        keywords = {
-            'Precessing': False,
-            'Hybridized': True,
-            }
-        # soft_lims -> raise warning when outside lims
-        # hard_lim -> raise error when outside lims
-        # Format is [qMax, chiMax].
-        soft_param_lims = [15.01, 0.5]
-        hard_param_lims = [20.1, 0.71]
-        super(NRHybSur2dq15, self).__init__(self.__class__.__name__, \
-            domain_type, keywords, soft_param_lims, hard_param_lims)
-
-    def _load_dimless_surrogate(self):
-        """
-        This function, which must be overriden for each derived class of
-        SurrogateEvaluator, handles the loading of the dimensionless surrogate.
-        This should return the loaded surrogate.
-        The loaded surrogate should have a __call__ function that returns the
-        dimensionless time/frequency array and dimensionless waveform modes.
-        The return value of this functions will be stored as
-        self._sur_dimless()
-        The __call__ function of self._sur_dimless() should take all inputs
-        passed to self._sur_dimless() in the __call__ function of this class.
-        """
-        sur = new_surrogate.AlignedSpinCoOrbitalFrameSurrogate()
-        sur.load(self.h5filename)
-        return sur
-
-    def _get_intrinsic_parameters(self, q, chiA0, chiB0, precessing_opts,
-            tidal_opts, par_dict):
-        """
-        This function, which must be overriden for each derived class of
-        SurrogateEvaluator, puts all intrinsic parameters of the surrogate
-        into a single array.
-        For example, for NRHybSur2dq15: x = [q, chiAz].
-        """
-        if par_dict is not None:
-            raise ValueError('Expected par_dict to be None.')
-
-        if not chiB0[2] == 0:
-            raise Exception('NRHybSur2dq15 assumes zero spin on secondary')
-        x = [q, chiA0[2]]
-        return x
-
 class NRSur7dq4(SurrogateEvaluator):
     """
 A class for the NRSur7dq4 surrogate model presented in Varma et al. 2019,
@@ -2172,6 +2114,7 @@ waveforms in the above range and has been tested against existing
 NR waveforms in that range.
 
 See the __call__ method on how to evaluate waveforms.
+In the __call__ method, x must have format x = [q, chi1, chi2].
     """
 
     def __init__(self, h5filename):
@@ -2216,13 +2159,79 @@ See the __call__ method on how to evaluate waveforms.
         return x
 
 
+class SEOBNRv4PHMSur(SurrogateEvaluator):
+    """
+A class for the NRSur7dq4 surrogate model presented in Varma et al. 2019,
+arxiv1905.09300.
+
+Evaluates gravitational waveforms generated by precessing binary black hole
+systems with generic mass ratios and spins.
+
+This model includes the following spin-weighted spherical harmonic modes:
+2<=ell<=4, -ell<=m<=ell.
+
+The parameter space of validity is:
+q \in [1, 6], and |chi1|,|chi2| \in [-1, 1], with generic directions.
+where q is the mass ratio and chi1/chi2 are the spin vectors of the
+heavier/lighter BH, respectively.
+
+The surrogate has been trained in the range
+q \in [1, 4] and |chi1|/|chi2| \in [-0.8, 0.8], but produces reasonable
+waveforms in the above range and has been tested against existing
+NR waveforms in that range.
+
+See the __call__ method on how to evaluate waveforms.
+In the __call__ method, x must have format x = [q, chi1, chi2].
+    """
+
+    def __init__(self, h5filename):
+        self.h5filename = h5filename
+        domain_type = 'Time'
+        keywords = {
+            'Precessing': True,
+            }
+        # soft_lims -> raise warning when outside lims
+        # hard_lim -> raise error when outside lims
+        # Format is [qMax, chiMax].
+        soft_param_lims = [20.01, 0.801]
+        hard_param_lims = [20.01, 1]
+        super(SEOBNRv4PHMSur, self).__init__(self.__class__.__name__, \
+            domain_type, keywords, soft_param_lims, hard_param_lims)
+
+    def _load_dimless_surrogate(self):
+        """
+        This function, which must be overriden for each derived class of
+        SurrogateEvaluator, handles the loading of the dimensionless surrogate.
+        This should return the loaded surrogate.
+        The loaded surrogate should have a __call__ function that returns the
+        dimensionless time/frequency array and dimensionless waveform modes.
+        The return value of this functions will be stored as
+        self._sur_dimless()
+        The __call__ function of self._sur_dimless() should take all inputs
+        passed to self._sur_dimless() in the __call__ function of this class.
+        See NRHybSur3dq8 for an example.
+        """
+        sur = precessing_surrogate.PrecessingSurrogate(self.h5filename)
+        return sur
+
+    def _get_intrinsic_parameters(self, q, chiA0, chiB0, precessing_opts,
+            tidal_opts, par_dict):
+        """
+        This function, which must be overriden for each derived class of
+        SurrogateEvaluator, puts all intrinsic parameters of the surrogate
+        into a single array.
+        For example, for NRSur7dq4: x = [q, chiA0, chiB0].
+        """
+        x = [q, chiA0, chiB0]
+        return x
+
 
 #### for each model in the catalog (name or h5 file), associate class to load
 #### NOTE: other classes maybe usable too, these just constitute
 ####       the default cases suitable for most people
 SURROGATE_CLASSES = {
     "NRHybSur3dq8": NRHybSur3dq8,
-    "NRHybSur2dq15": NRHybSur2dq15,
+    "SEOBNRv4PHMSur": SEOBNRv4PHMSur,
     "NRSur7dq4": NRSur7dq4,
     "NRHybSur3dq8Tidal": NRHybSur3dq8Tidal,
 #    "SpEC_q1_10_NoSpin_nu5thDegPoly_exclude_2_0.h5":EvaluateSurrogate # model SpEC_q1_10_NoSpin
@@ -2292,6 +2301,8 @@ class LoadSurrogate(object):
                     raise Exception("Surrogate data not found. Do"
                         " gwsurrogate.catalog.pull(NRHybSur3dq8)")
                 #return NRHybSur3dq8Tidal(surrogate_h5file)
+            elif (surrogate_name=='SEOBNRv4PHMSur'):
+                surrogate_h5file = '%s/SEOBNRv4PHMSur.h5'%(catalog.download_path())
             else:
                 surrogate_h5file = '%s/%s.h5'%(catalog.download_path(), \
                     surrogate_name)
@@ -2299,7 +2310,8 @@ class LoadSurrogate(object):
                     print("Surrogate data not found for %s. Downloading now."%surrogate_name)
                     catalog.pull(surrogate_name)
 
-        if surrogate_name not in SURROGATE_CLASSES.keys():
-            raise Exception('Invalid surrogate : %s'%surrogate_name)
-        else:
-            return SURROGATE_CLASSES[surrogate_name](surrogate_h5file)
+        # if surrogate_name not in SURROGATE_CLASSES.keys():
+        #     raise Exception('Invalid surrogate : %s'%surrogate_name)
+        # else:
+        return SURROGATE_CLASSES[surrogate_name](surrogate_h5file)
+
