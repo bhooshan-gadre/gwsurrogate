@@ -1,9 +1,12 @@
 """
 A module for evaluating precessing surrogate models of gravitational waves
 from numerical relativity simulations of binary black hole mergers.
+
+
 NOTE: Currently, this code only works for the NRSur7dq4 model. Yet most
 of the routines are general purpose. The function _get_fit_settings
 provides settings for NRSur7dq4. A few other places may have hard-coded values.
+
 NOTE: Many of these functions are borrowed from the NR7dq2 python package.
 """
 
@@ -47,6 +50,7 @@ for -L \leq m', m \leq L.
 Returns a list where each entry is a numpy array with shape
 ((2*ell+1), (2*ell+1), N) corresponding to a given value of ell, taking indices
 for m', m, and t_i.
+
 Parts of this function are adapted from GWFrames:
 https://github.com/moble/GWFrames
 written by Michael Boyle, based on his paper:
@@ -109,6 +113,7 @@ quat: A quaternion array with shape (4, N) where N is the number of time
 h: An array of waveform modes with shape (n_modes, N). The modes are ordered
     (2, -2), ..., (2, 2), (3, -3), ...
     and n_modes = 5, 12, or 21 for ellMax = 2, 3, or 4.
+
 Returns: h_inertial, a similar array to h containing the inertial frame modes.
     """
     quat = quatInv(quat)
@@ -153,10 +158,15 @@ def _get_fit_settings():
      These are to rescale the mass ratio fit range
      from [-0.01, np.log(4+0.01)] to [-1, 1]. The chi fits are already in
      this range.
+
+
      Values defined here are model-specific. These values are for NRSur7dq4.
     """
-    q_fit_offset = -0.9857019407834238
-    q_fit_slope = 1.4298059216576398
+    # q_fit_offset = -0.9857019407834238
+    # q_fit_slope = 1.4298059216576398
+    ## slope and offset are used here are global
+    global q_fit_offset
+    global q_fit_slope
     q_max_bfOrder = 3
     chi_max_bfOrder = 2
     return q_fit_offset, q_fit_slope, q_max_bfOrder, chi_max_bfOrder
@@ -169,20 +179,21 @@ def _get_fit_params(x):
         Both chiHat and chi_a always lie in range [-1, 1].
     """
 
-    x = np.copy(x)
+    ## Literally do nothing!!
+    # x = np.copy(x)
 
-    q = float(x[0])
-    chi1z = float(x[3])
-    chi2z = float(x[6])
-    eta = q/(1.+q)**2
-    chi_wtAvg = (q*chi1z+chi2z)/(1+q)
-    chiHat = (chi_wtAvg - 38.*eta/113.*(chi1z + chi2z)) \
-        /(1. - 76.*eta/113.)
-    chi_a = (chi1z - chi2z)/2.
-
-    x[0] = np.log(q)
-    x[3] = chiHat
-    x[6] = chi_a
+    # q = float(x[0])
+    # chi1z = float(x[3])
+    # chi2z = float(x[6])
+    # eta = q/(1.+q)**2
+    # chi_wtAvg = (q*chi1z+chi2z)/(1+q)
+    # chiHat = (chi_wtAvg - 38.*eta/113.*(chi1z + chi2z)) \
+    #     /(1. - 76.*eta/113.)
+    # chi_a = (chi1z - chi2z)/2.
+    #
+    # x[0] = np.log(q)
+    # x[3] = chiHat
+    # x[6] = chi_a
 
     return x
 
@@ -211,15 +222,18 @@ class DynamicsSurrogate:
     """
 A surrogate intended to reproduce the orbital, precession, and spin dynamics
 of numerical relativity BBH waveforms and spins.
+
 This surrogate models:
     -The coprecessing frame
     -The orbital phase in the coprecessing frame, which we can use
      to find the coorbital frame
     -The spin directions in the coprecessing frame
+
 As input, it takes:
     -The quaternion giving the initial coprecessing frame
     -The initial orbital phase in the coprecessing frame
     -The initial spin directions in the coprecessing frame
+
 Using the input, it evolves a system of ODEs.
 Given the things this surrogate models at time t, it evaluates a
 prediction for:
@@ -274,7 +288,11 @@ These time derivatives are given to the AB4 ODE solver.
                     })
         return fit_data
 
-
+    def get_omega(self, i0, q, y):
+        x = _utils.get_ds_fit_x(y, q)
+        fit_params = _get_fit_params(x)
+        omega = _eval_scalar_fit(self.fit_data[i0]['omega'], fit_params)
+        return omega
 
     def get_time_deriv_from_index(self, i0, q, y):
         # Setup fit variables
@@ -317,18 +335,14 @@ cubic interpolation. Use get_time_deriv_from_index when possible.
 
         return dydt
 
-    def get_omega(self, i0, q, y):
-        x = _utils.get_ds_fit_x(y, q)
-        fit_params = _get_fit_params(x)
-        omega = _eval_scalar_fit(self.fit_data[i0]['omega'], fit_params)
-        return omega
-
     def _get_t_from_omega(self, omega_ref, q, chiA0, chiB0, init_orbphase,
             init_quat):
 
         if omega_ref > 0.201:
-            raise Exception("Got omega_ref = %0.4f > 0.2, too "
+            print("Got omega_ref = %0.4f > 0.2, too "
                     "large for the NRSur7dq4 model!"%(omega_ref))
+            # raise Exception("Got omega_ref = %0.4f > 0.2, too "
+            #         "large for the NRSur7dq4 model!"%(omega_ref))
 
         y0 = np.append(np.array([1., 0., 0., 0., init_orbphase]),
                 np.append(chiA0, chiB0))
@@ -366,7 +380,7 @@ cubic interpolation. Use get_time_deriv_from_index when possible.
 
         if t_ref < self.t[0] or t_ref > self.t[-1]:
             raise Exception("Somehow, t_ref ended up being outside of "
-                    "the time domain limits!")
+                    "the time domain limits of {} and {}!".format(self.t[0], self.t[-1]))
 
         return t_ref
 
@@ -374,6 +388,7 @@ cubic interpolation. Use get_time_deriv_from_index when possible.
             t_ref=None, omega_ref=None, omega_low=None):
         """
 Computes the modeled NR dynamics given the initial conditions.
+
 Arguments:
 =================
 q: The mass ratio
@@ -389,9 +404,11 @@ The above spins must be in the lalsimulation conventions, where
     defined using vector inner products. This is equivalent to
     specifying the spins in the coorbital frame used in the
     surrogate papers.
+
     The surrogate internally initializes the spins in the coprecessing frame.
     Therefore, before evaluating the surrogate, the spins will be rotated about
     the z-axis by init_orbphase.
+
 init_quat: The quaternion giving the rotation to the coprecessing frame at the
         reference time. By default, this will be the identity quaternion,
         indicating the coprecessing frame is aligned with the inertial frame.
@@ -406,6 +423,7 @@ omega_ref: The dimensionless orbital angular frequency used to determine t_ref,
 omega_low: The dimensionless orbital angular frequency used to determine t_low,
         the start time of the waveform data. If None, uses the full surrogate
         data.
+
 Returns:
 ==================
 q_copr: The quaternion representing the coprecessing frame with shape (4, L)
@@ -413,6 +431,7 @@ orbphase: The orbital phase in the coprecessing frame with shape (L, )
 chiA_copr: The time-dependent chiA in the coprecessing frame with shape (L, 3)
 chiB_copr: The time-dependent chiB in the coprecessing frame with shape (L, 3)
 t_low: The time corresponding to omega_low.
+
 L = len(self.t), and these returned arrays are sampled at self.t
         """
 
@@ -425,6 +444,13 @@ L = len(self.t), and these returned arrays are sampled at self.t
         # must rotate the (x, y) spin components by init_orbphase.
         chiA0 = rotate_spin(chiA0, -1 * init_orbphase)
         chiB0 = rotate_spin(chiB0, -1 * init_orbphase)
+
+        case_id = get_domain(q, chiA0[2], chiB0[2])
+        print("Sub-domain number {}".format(case_id))
+        global q_fit_offset
+        global q_fit_slope
+        assert (q_fit_offset == q_fit_offsets[case_id]), "fit offset is not correct; it is {} and it should be {}".format(q_fit_offset, q_fit_offsets[case_id])
+        assert (q_fit_slope == q_fit_slopes[case_id]), "fit slope is not correct; it is {} and it should be {}".format(q_fit_slope, q_fit_slopes[case_id])
 
         normA = np.sqrt(np.sum(chiA0**2))
         normB = np.sqrt(np.sum(chiB0**2))
@@ -441,7 +467,7 @@ L = len(self.t), and these returned arrays are sampled at self.t
         if omega_low is not None:
             # If omega_low and omega_ref are the same, no need to
             # recompute t_low
-            if abs(omega_low - omega_ref) < 1e-10:
+            if abs(omega_low == omega_ref) < 1e-10:
                 t_low = t_ref
             else:
                 t_low = self._get_t_from_omega(omega_low, q, chiA0, chiB0, \
@@ -449,9 +475,12 @@ L = len(self.t), and these returned arrays are sampled at self.t
         else:
             t_low = None
 
-
+        # FIXME below:
+        print("Initializing with q, chiA0, chiB0, init_quat,init_orbphase, t_ref:")
+        print(q, chiA0, chiB0, init_quat,init_orbphase, t_ref)
         y_of_t, i0 = self._initialize(q, chiA0, chiB0, init_quat,
                 init_orbphase, t_ref, normA, normB)
+        print("i0=", i0)
 
         if i0 == 0:
             # Just gonna send it!
@@ -720,24 +749,25 @@ class CoorbitalWaveformSurrogate:
         self.data = {}
         self.mode_list = []
         for ell in range(2, self.ellMax+1):
-            # m=0 is different
-            self.mode_list.append( (ell,0) )
-            for reim in ['real', 'imag']:
-                group = h5file['hCoorb_%s_0_%s'%(ell, reim)]
-                self.data['%s_0_%s'%(ell, reim)] \
-                        = _extract_component_data(group)
+            # # m=0 is different
+            # self.mode_list.append( (ell,0) )
+            # for reim in ['real', 'imag']:
+            #     group = h5file['hCoorb_%s_0_%s'%(ell, reim)]
+            #     self.data['%s_0_%s'%(ell, reim)] \
+            #             = _extract_component_data(group)
 
             for m in range(1, ell+1):
-                self.mode_list.append( (ell,m) )
-                self.mode_list.append( (ell,-m) )
-                for reim in ['Re', 'Im']:
-                    for pm in ['+', '-']:
-                        group = h5file['hCoorb_%s_%s_%s%s'%(ell, m, reim, pm)]
-                        tmp_data = _extract_component_data(group)
-                        self.data['%s_%s_%s%s'%(ell, m, reim, pm)] = tmp_data
+                if m == ell or (ell == 2 and m == 1):
+                    self.mode_list.append( (ell,m) )
+                    self.mode_list.append( (ell,-m) )
+                    for reim in ['Re', 'Im']:
+                        for pm in ['+', '-']:
+                            group = h5file['hCoorb_%s_%s_%s%s'%(ell, m, reim, pm)]
+                            tmp_data = _extract_component_data(group)
+                            self.data['%s_%s_%s%s'%(ell, m, reim, pm)] = tmp_data
 
 
-    def __call__(self, q, chiA, chiB, ellMax=4):
+    def __call__(self, q, chiA, chiB, ellMax=5):
         """
 Evaluates the coorbital waveform modes.
 q: The mass ratio
@@ -748,20 +778,28 @@ ellMax: The maximum ell mode to evaluate.
         nmodes = ellMax*ellMax + 2*ellMax - 3
         modes = 1.j*np.zeros((nmodes, len(self.t)))
 
+        # case_id = get_domain(q, chiA0[2], chiB0[2])
+        # print("Sub-domain number {}".format(case_id))
+        # global q_fit_offset
+        # global q_fit_slope
+        # assert (q_fit_offset == q_fit_offsets[case_id]), "fit offset is not correct; it is {} and it should be {}".format(q_fit_offset, q_fit_offsets[case_id])
+        # assert (q_fit_slope == q_fit_slopes[case_id]), "fit slope is not correct; it is {} and it should be {}".format(q_fit_slope, q_fit_slopes[case_id])
+
         for ell in range(2, ellMax+1):
-            # m=0 is different
-            re = _eval_comp(self.data['%s_0_real'%(ell)], q, chiA, chiB)
-            im = _eval_comp(self.data['%s_0_imag'%(ell)], q, chiA, chiB)
-            modes[ell*(ell+1) - 4] = re + 1.j*im
+            # # m=0 is different
+            # re = _eval_comp(self.data['%s_0_real'%(ell)], q, chiA, chiB)
+            # im = _eval_comp(self.data['%s_0_imag'%(ell)], q, chiA, chiB)
+            # modes[ell*(ell+1) - 4] = re + 1.j*im
 
             for m in range(1, ell+1):
-                rep = _eval_comp(self.data['%s_%s_Re+'%(ell, m)], q, chiA,chiB)
-                rem = _eval_comp(self.data['%s_%s_Re-'%(ell, m)], q, chiA,chiB)
-                imp = _eval_comp(self.data['%s_%s_Im+'%(ell, m)], q, chiA,chiB)
-                imm = _eval_comp(self.data['%s_%s_Im-'%(ell, m)], q, chiA,chiB)
-                h_posm, h_negm = _assemble_mode_pair(rep, rem, imp, imm)
-                modes[ell*(ell+1) - 4 + m] = h_posm
-                modes[ell*(ell+1) - 4 - m] = h_negm
+                if m == ell or (ell == 2 and m == 1):
+                    rep = _eval_comp(self.data['%s_%s_Re+'%(ell, m)], q, chiA,chiB)
+                    rem = _eval_comp(self.data['%s_%s_Re-'%(ell, m)], q, chiA,chiB)
+                    imp = _eval_comp(self.data['%s_%s_Im+'%(ell, m)], q, chiA,chiB)
+                    imm = _eval_comp(self.data['%s_%s_Im-'%(ell, m)], q, chiA,chiB)
+                    h_posm, h_negm = _assemble_mode_pair(rep, rem, imp, imm)
+                    modes[ell*(ell+1) - 4 + m] = h_posm
+                    modes[ell*(ell+1) - 4 - m] = h_negm
 
         return modes
 
@@ -812,25 +850,41 @@ def normalize_spin(chi, chi_norm):
 class PrecessingSurrogate(object):
     """
 A wrapper class for the precessing surrogate models.
+
 See the __call__ method on how to evaluate waveforms.
     """
 
     def __init__(self, filename):
         """
 Loads the surrogate model data.
+
 filename: The hdf5 file containing the surrogate data."
         """
-        h5file = h5py.File(filename, 'r')
-        self.dynamics_sur = DynamicsSurrogate(h5file)
-        self.coorb_sur = CoorbitalWaveformSurrogate(h5file)
-        self.t_coorb = self.coorb_sur.t
-        self.tds = np.append(self.dynamics_sur.t[0:6:2], \
-            self.dynamics_sur.t[6:])
+        self.dynamics_sur_dict = {}
+        self.coorb_sur_dict = {}
+        self.t_coorb_dict = {}
+        self.tds_dict = {}
+        self.t_0_dict = {}
+        self.t_f_dict = {}
 
-        self.t_0 = self.t_coorb[0]
-        self.t_f = self.t_coorb[-1]
+        h5fl = h5py.File(filename, 'r')
 
-        self.mode_list = self.coorb_sur.mode_list
+        for case_id, k in enumerate(h5fl.keys()):
+            domain_name = 'dom_{}'.format(case_id)
+            # assert (domain_name == k), "Domain name and k in the surrogate data file do not match!"
+            h5file = h5fl[domain_name]
+
+            self.dynamics_sur_dict[case_id] = DynamicsSurrogate(h5file)
+            self.coorb_sur_dict[case_id] = CoorbitalWaveformSurrogate(h5file)
+            self.t_coorb_dict[case_id] = self.coorb_sur_dict[case_id].t
+            self.tds_dict[case_id] = np.append(self.dynamics_sur_dict[case_id].t[0:6:2], \
+                self.dynamics_sur_dict[case_id].t[6:])
+
+            self.t_0_dict[case_id] = self.t_coorb_dict[case_id][0]
+            self.t_f_dict[case_id] = self.t_coorb_dict[case_id][-1]
+
+
+        self.mode_list = self.coorb_sur_dict[0].mode_list
 
 
     def _check_unused_opts(self, precessing_opts):
@@ -852,17 +906,25 @@ filename: The hdf5 file containing the surrogate data."
         """
         Wrapper for self.dynamics_sur()
         """
+        case_id = get_domain(q, chiA0[2], chiB0[2])
+        print("Sub-domain number {}".format(case_id))
+        global q_fit_offset
+        global q_fit_slope
+        assert (q_fit_offset == q_fit_offsets[case_id]), "fit offset is not correct; it is {} and it should be {}".format(q_fit_offset, q_fit_offsets[case_id])
+        assert (q_fit_slope == q_fit_slopes[case_id]), "fit slope is not correct; it is {} and it should be {}".format(q_fit_slope, q_fit_slopes[case_id])
+
         quat_dyn, orbphase_dyn, chiA_copr_dyn, chiB_copr_dyn, t0 \
-            = self.dynamics_sur(q, chiA0, chiB0, init_orbphase=init_orbphase, \
+            = self.dynamics_sur_dict[case_id](q, chiA0, chiB0, init_orbphase=init_orbphase, \
             init_quat=init_quat, t_ref=t_ref, omega_ref=omega_ref)
         return quat_dyn, orbphase_dyn, chiA_copr_dyn, chiB_copr_dyn
 
 
     def __call__(self, x, fM_low=None, fM_ref=None, dtM=None,
             timesM=None, dfM=None, freqsM=None, mode_list=None, ellMax=None,
-            precessing_opts=None, tidal_opts=None, par_dict=None):
+            precessing_opts=None, tidal_opts=None, par_dict=None, return_coorb=False):
         """
 Evaluates a precessing surrogate model.
+
 Arguments:
     x:  Parameters, x = q, chiA0, chiB0. Where,
         q: The mass ratio mA/mB, where A (B) refers to the heavier BH.
@@ -870,6 +932,7 @@ Arguments:
                 coprecessing frame. They should be length 3 lists or numpy
                 arrays.  These are $\\vec{\chi_{1,2}^\mathrm{copr}(t_0)$ in
                 THE PAPER.
+
         chiA0: The chiA vector at the reference time.
         chiB0: The chiB vector at the reference time.
         The above spins use lalsimulation conventions, where
@@ -882,6 +945,7 @@ Arguments:
             defined using vector inner products. This is equivalent to
             specifying the spins in the coorbital frame used in the
             surrogate papers.
+
     fM_low:     Initial frequency in dimensionless units. Currently only
                 fM_low = 0 is allowed, in which case the full surrogate is
                 returned.
@@ -897,6 +961,7 @@ Arguments:
     ellMax:     The maximum ell modes to use. The NRSur7dq4 surrogate model
                 contains modes up to L=4. Using ellMax=2 or ellMax=3 reduces
                 the evaluation time.
+
     precessing_opts:
                 A dictionary containing optional parameters for a precessing
                 surrogate model. Default: None.
@@ -920,6 +985,8 @@ Arguments:
                                     }
     tidal_opts: Should be None for this model.
     par_dict: Should be None for this model.
+
+
 Returns:
     domain, h, dynamics.
         """
@@ -943,11 +1010,18 @@ Returns:
         self._check_unused_opts(precessing_opts)
 
         if ellMax is None:
-            ellMax = 4
-        if ellMax > 4:
+            ellMax = 5
+        if ellMax > 5:
             raise ValueError("NRSur7dq4 only allows ellMax<=4.")
 
         q, chiA0, chiB0 = x
+        case_id = get_domain(q, chiA0[2], chiB0[2])
+        print("Sub-domain number {}".format(case_id))
+        global q_fit_offset
+        global q_fit_slope
+        assert (q_fit_offset == q_fit_offsets[case_id]), "fit offset is not correct; it is {} and it should be {}".format(q_fit_offset, q_fit_offsets[case_id])
+        assert (q_fit_slope == q_fit_slopes[case_id]), "fit slope is not correct; it is {} and it should be {}".format(q_fit_slope, q_fit_slopes[case_id])
+
 
         chiA_norm = np.sqrt(np.sum(chiA0**2))
         chiB_norm = np.sqrt(np.sum(chiB0**2))
@@ -967,7 +1041,7 @@ Returns:
 
         ## Get dynamics
         quat_dyn, orbphase_dyn, chiA_copr_dyn, chiB_copr_dyn, t0 \
-            = self.dynamics_sur(q, chiA0, chiB0, init_orbphase=init_orbphase, \
+            = self.dynamics_sur_dict[case_id](q, chiA0, chiB0, init_orbphase=init_orbphase, \
             init_quat=init_quat, t_ref=None, omega_ref=omega_ref, \
             omega_low=omega_low)
 
@@ -980,40 +1054,38 @@ Returns:
         # Interpolate to the coorbital time grid, and transform to coorb frame.
         # Interpolate first since coorbital spins oscillate faster than
         # coprecessing spins
-        chiA_copr = splinterp_many(self.t_coorb, self.tds, chiA_copr_dyn.T).T
-        chiB_copr = splinterp_many(self.t_coorb, self.tds, chiB_copr_dyn.T).T
-        chiA_copr = normalize_spin(chiA_copr, chiA_norm)
-        chiB_copr = normalize_spin(chiB_copr, chiB_norm)
-        orbphase = _splinterp_Cwrapper(self.t_coorb, self.tds, orbphase_dyn)
+        chiA_copr = splinterp_many(self.t_coorb_dict[case_id], self.tds_dict[case_id], chiA_copr_dyn.T).T
+        chiB_copr = splinterp_many(self.t_coorb_dict[case_id], self.tds_dict[case_id], chiB_copr_dyn.T).T
+        # chiA_copr = normalize_spin(chiA_copr, chiA_norm)
+        # chiB_copr = normalize_spin(chiB_copr, chiB_norm)
+        orbphase = _splinterp_Cwrapper(self.t_coorb_dict[case_id], self.tds_dict[case_id], orbphase_dyn)
 
-        quat = splinterp_many(self.t_coorb, self.tds, quat_dyn)
+        quat = splinterp_many(self.t_coorb_dict[case_id], self.tds_dict[case_id], quat_dyn)
         quat = quat/np.sqrt(np.sum(abs(quat)**2, 0))
         chiA_coorb, chiB_coorb = coorb_spins_from_copr_spins(
                 chiA_copr, chiB_copr, orbphase)
 
 
         # Evaluate coorbital waveform surrogate
-        h_coorb = self.coorb_sur(q, chiA_coorb, chiB_coorb, \
+        h_coorb = self.coorb_sur_dict[case_id](q, chiA_coorb, chiB_coorb, \
                 ellMax=ellMax)
 
         # Transform the sparsely sampled waveform
-        h_inertial = inertial_waveform_modes(self.t_coorb, orbphase, quat,
+        h_inertial = inertial_waveform_modes(self.t_coorb_dict[case_id], orbphase, quat,
                 h_coorb)
 
         if timesM is not None:
-            if timesM[-1] > self.t_coorb[-1] + 0.01:
+            if timesM[-1] > self.t_coorb_dict[case_id][-1] + 0.01:
                 raise Exception("'times' includes times larger than the"
                     " maximum time value in domain.")
-            if timesM[0] < self.t_coorb[0]:
+            if timesM[0] < self.t_coorb_dict[case_id][0]:
                 raise Exception("'times' starts before start of domain. Try"
                     " increasing initial value of times or reducing f_low.")
 
         return_times = True
         if dtM is None and timesM is None:
-            # Use the sparse domain. Python normally copies numpy arrays by
-            # reference, so we do a deep copy so as to not overwrite
-            # self.t_coorb.
-            timesM = np.copy(self.t_coorb)
+            # Use the sparse domain
+            timesM = self.t_coorb_dict[case_id]
             do_interp = False
         else:
             ## Interpolate onto uniform domain if needed
@@ -1022,8 +1094,8 @@ Returns:
                 # If omega_low=0 or None, t0 would have been set to None,
                 # in which case we use the full surrogate length
                 if t0 is None:
-                    t0 = self.t_coorb[0]
-                tf = self.t_coorb[-1]
+                    t0 = self.t_coorb_dict[case_id][0]
+                tf = self.t_coorb_dict[case_id][-1]
                 num_times = int(np.ceil((tf - t0)/dtM));
                 timesM = t0 + dtM*np.arange(num_times)
             else:
@@ -1031,8 +1103,8 @@ Returns:
 
 
         if do_interp:
-            hre = splinterp_many(timesM, self.t_coorb, np.real(h_inertial))
-            him = splinterp_many(timesM, self.t_coorb, np.imag(h_inertial))
+            hre = splinterp_many(timesM, self.t_coorb_dict[case_id], np.real(h_inertial))
+            him = splinterp_many(timesM, self.t_coorb_dict[case_id], np.imag(h_inertial))
             h_inertial = hre + 1.j*him
 
         # Make mode dict
@@ -1047,26 +1119,155 @@ Returns:
         if return_dynamics:
 
             if do_interp:
-                ## Interpolate from self.tds to timesM because that is what
+                ## Interpolate from self.tds_dict[case_id] to timesM because that is what
                 ## is done in the LAL code.
-                chiA_copr = splinterp_many(timesM, self.tds, chiA_copr_dyn.T).T
-                chiB_copr = splinterp_many(timesM, self.tds, chiB_copr_dyn.T).T
+                chiA_copr = splinterp_many(timesM, self.tds_dict[case_id], chiA_copr_dyn.T).T
+                chiB_copr = splinterp_many(timesM, self.tds_dict[case_id], chiB_copr_dyn.T).T
                 chiA_copr = normalize_spin(chiA_copr, chiA_norm)
                 chiB_copr = normalize_spin(chiB_copr, chiB_norm)
-                orbphase = _splinterp_Cwrapper(timesM, self.tds, orbphase_dyn)
-                quat = splinterp_many(timesM, self.tds, quat_dyn)
+                orbphase = _splinterp_Cwrapper(timesM, self.tds_dict[case_id], orbphase_dyn)
+                quat = splinterp_many(timesM, self.tds_dict[case_id], quat_dyn)
                 quat = quat/np.sqrt(np.sum(abs(quat)**2, 0))
 
-            chiA_inertial = transformTimeDependentVector(quat, chiA_copr.T).T
-            chiB_inertial = transformTimeDependentVector(quat, chiB_copr.T).T
+            # chiA_coorb, chiB_coorb = coorb_spins_from_copr_spins(
+            #         chiA_copr, chiB_copr, orbphase)
+
+            # chiA_inertial = transformTimeDependentVector(quat, chiA_copr.T).T
+            # chiB_inertial = transformTimeDependentVector(quat, chiB_copr.T).T
 
             dynamics = {
-                'chiA': chiA_inertial,
-                'chiB': chiB_inertial,
+                # FIXME: We are sending out copr spins now!
+                # 'chiA': chiA_inertial,
+                # 'chiB': chiB_inertial,
+                'chiA': chiA_copr,
+                'chiB': chiB_copr,
                 'q_copr': quat,
                 'orbphase': orbphase,
                 }
         else:
             dynamics = None
 
-        return timesM, h, dynamics
+        if return_coorb:
+            if do_interp:
+                hre = splinterp_many(timesM, self.t_coorb_dict[case_id], np.real(h_coorb))
+                him = splinterp_many(timesM, self.t_coorb_dict[case_id], np.imag(h_coorb))
+                h_coorb = hre + 1.j*him
+
+            h_c = {}
+            i=0
+            for ell in range(2, ellMax+1):
+                for m in range(-ell, ell+1):
+                    h_c[(ell, m)] = h_coorb[i]
+                    i += 1
+
+            return timesM, h, dynamics, h_c
+        else:
+            return timesM, h, dynamics
+
+q_fit_offsets = [-2.5590551181102366,
+                -2.3809523809523814,
+                -3.125,
+                -3.125,
+                -3.125,
+                -4.829545454545455,
+                -4.829545454545455,
+                -4.829545454545455,
+                -4.528985507246377,
+                -4.528985507246377,
+                -4.528985507246377,
+                -6.340579710144926,
+                -6.340579710144926,
+                -6.340579710144926]
+
+q_fit_slopes = [1.5748031496062995,
+                0.7936507936507938,
+                0.5681818181818182,
+                0.5681818181818182,
+                0.5681818181818182,
+                0.5681818181818182,
+                0.5681818181818182,
+                0.5681818181818182,
+                0.3623188405797102,
+                0.3623188405797102,
+                0.3623188405797102,
+                0.36231884057971003,
+                0.36231884057971003,
+                0.36231884057971003]
+
+q_fit_offset = None
+q_fit_slope = None
+
+def get_domain(q, chi1z, chi2z):
+    chi_eff = (q*chi1z + chi2z) / (q + 1.)
+    print("q, chi_eff: ", q, chi_eff)
+    global q_fit_offset
+    global q_fit_slope
+    if q <= 2.:
+        q_fit_offset = q_fit_offsets[0]
+        q_fit_slope = q_fit_slopes[0]
+        return 0
+
+    if q <= 4.:
+        q_fit_offset = q_fit_offsets[1]
+        q_fit_slope = q_fit_slopes[1]
+        return 1
+
+    if q <= 7. and chi_eff <= -0.3:
+        q_fit_offset = q_fit_offsets[2]
+        q_fit_slope = q_fit_slopes[2]
+        return 2
+
+    if q <= 7. and chi_eff <= 0.3:
+        q_fit_offset = q_fit_offsets[3]
+        q_fit_slope = q_fit_slopes[3]
+        return 3
+
+    if q <= 7. and chi_eff > 0.3:
+        q_fit_offset = q_fit_offsets[4]
+        q_fit_slope = q_fit_slopes[4]
+        return 4
+
+    if q <= 10. and chi_eff <= -0.3:
+        q_fit_offset = q_fit_offsets[5]
+        q_fit_slope = q_fit_slopes[5]
+        return 5
+
+    if q <= 10. and chi_eff <= 0.3:
+        q_fit_offset = q_fit_offsets[6]
+        q_fit_slope = q_fit_slopes[6]
+        return 6
+
+    if q <= 10. and chi_eff > 0.3:
+        q_fit_offset = q_fit_offsets[7]
+        q_fit_slope = q_fit_slopes[7]
+        return 7
+
+    if q <= 15. and chi_eff <= -0.3:
+        q_fit_offset = q_fit_offsets[8]
+        q_fit_slope = q_fit_slopes[8]
+        return 8
+
+    if q <= 15. and chi_eff <= 0.3:
+        q_fit_offset = q_fit_offsets[9]
+        q_fit_slope = q_fit_slopes[9]
+        return 9
+
+    if q <= 15. and chi_eff > 0.3:
+        q_fit_offset = q_fit_offsets[10]
+        q_fit_slope = q_fit_slopes[10]
+        return 10
+
+    if q > 15. and chi_eff <= -0.3:
+        q_fit_offset = q_fit_offsets[11]
+        q_fit_slope = q_fit_slopes[11]
+        return 11
+
+    if q > 15. and chi_eff <= 0.3:
+        q_fit_offset = q_fit_offsets[12]
+        q_fit_slope = q_fit_slopes[12]
+        return 12
+
+    if q > 15. and chi_eff > 0.3:
+        q_fit_offset = q_fit_offsets[13]
+        q_fit_slope = q_fit_slopes[13]
+        return 13

@@ -154,9 +154,26 @@ _surrogate_world['EMRISur1dq1e4'] = \
 _surrogate_world['SEOBNRv4PHMSur'] = \
     surrogate_info(\
     'SEOBNRv4PHMSur.h5',
-        '''WRITE ME''',
-        '''WRITE ME''',
-         None)
+        '''Do not have zendo record yet''',
+        '''Surrogate model for the time domain precessing EOB waveform model
+        SEOBNRv4PHM (). The model is valid for mass ratio <= 20 and spin
+        magnitudes upto 0.8. Extrapolation for spins works reasonably well till
+        0.9 and maybe till 0.95 for q < 5. The model has (2,2), (2,1), (3,3),
+        (4,4) and (5,5) modes in coorbital frame. So one can choose ellMax <=5
+        for inertial frame waveforms. Surrogate is 5000M long.''',
+         2ce450b06ca29d24d538dc86e81a31d4)
+
+_surrogate_world['SEOBNRv4PHMSur_long'] = \
+    surrogate_info(\
+    'SEOBNRv4PHMSur80kM.h5',
+        '''Do not have zendo record yet''',
+        '''Surrogate model for the time domain precessing EOB waveform model
+        SEOBNRv4PHM (). The model is valid for mass ratio <= 2 and spin
+        magnitudes upto 0.8. Extrapolation for spins have not been tested.
+        The model has (2,2), (2,1), (3,3), (4,4) and (5,5) modes in coorbital
+        frame. So one can choose ellMax <=5 for inertial frame waveforms.
+        Surrogate is 80000M long. This similar to SEOBNRv4PHMSur.''',
+         a09b744db1787c7800fadb74312385de)
 
 # TODO: test function, and then use it whenever a file is loaded
 def is_file_recent(filename):
