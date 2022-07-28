@@ -1129,18 +1129,15 @@ Returns:
                 quat = splinterp_many(timesM, self.tds_dict[case_id], quat_dyn)
                 quat = quat/np.sqrt(np.sum(abs(quat)**2, 0))
 
-            # chiA_coorb, chiB_coorb = coorb_spins_from_copr_spins(
-            #         chiA_copr, chiB_copr, orbphase)
-
-            # chiA_inertial = transformTimeDependentVector(quat, chiA_copr.T).T
-            # chiB_inertial = transformTimeDependentVector(quat, chiB_copr.T).T
+            chiA_inertial = transformTimeDependentVector(quat, chiA_copr.T).T
+            chiB_inertial = transformTimeDependentVector(quat, chiB_copr.T).T
 
             dynamics = {
                 # FIXME: We are sending out copr spins now!
-                # 'chiA': chiA_inertial,
-                # 'chiB': chiB_inertial,
-                'chiA': chiA_copr,
-                'chiB': chiB_copr,
+                'chiA': chiA_inertial,
+                'chiB': chiB_inertial,
+                # 'chiA': chiA_copr,
+                # 'chiB': chiB_copr,
                 'q_copr': quat,
                 'orbphase': orbphase,
                 }
