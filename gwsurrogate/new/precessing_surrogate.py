@@ -857,6 +857,12 @@ filename: The hdf5 file containing the surrogate data."
             init_quat=init_quat, t_ref=t_ref, omega_ref=omega_ref)
         return quat_dyn, orbphase_dyn, chiA_copr_dyn, chiB_copr_dyn
 
+    def get_min_omega(q, chiA0, chiB0, init_quat=None, init_orbphase=0.0):
+        y0 = np.append(np.array([1., 0., 0., 0., init_orbphase]),
+                np.append(chiA0, chiB0))
+        if init_quat is not None:
+            y0[:4] = init_quat
+        return self.dynamics_sur.get_omega(0, q, y0)
 
     def __call__(self, x, fM_low=None, fM_ref=None, dtM=None,
             timesM=None, dfM=None, freqsM=None, mode_list=None, ellMax=None,

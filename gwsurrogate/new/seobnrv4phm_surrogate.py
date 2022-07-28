@@ -339,10 +339,8 @@ cubic interpolation. Use get_time_deriv_from_index when possible.
             init_quat):
 
         if omega_ref > 0.201:
-            print("Got omega_ref = %0.4f > 0.2, too "
-                    "large for the NRSur7dq4 model!"%(omega_ref))
-            # raise Exception("Got omega_ref = %0.4f > 0.2, too "
-            #         "large for the NRSur7dq4 model!"%(omega_ref))
+            raise Exception("Got omega_ref = %0.4f > 0.2, too "
+                    "large for the SEOBNRv4PHSur  model!"%(omega_ref))
 
         y0 = np.append(np.array([1., 0., 0., 0., init_orbphase]),
                 np.append(chiA0, chiB0))
@@ -446,7 +444,7 @@ L = len(self.t), and these returned arrays are sampled at self.t
         chiB0 = rotate_spin(chiB0, -1 * init_orbphase)
 
         case_id = get_domain(q, chiA0[2], chiB0[2])
-        print("Sub-domain number {}".format(case_id))
+        # print("Sub-domain number {}".format(case_id))
         global q_fit_offset
         global q_fit_slope
         assert (q_fit_offset == q_fit_offsets[case_id]), "fit offset is not correct; it is {} and it should be {}".format(q_fit_offset, q_fit_offsets[case_id])
@@ -476,11 +474,11 @@ L = len(self.t), and these returned arrays are sampled at self.t
             t_low = None
 
         # FIXME below:
-        print("Initializing with q, chiA0, chiB0, init_quat,init_orbphase, t_ref:")
-        print(q, chiA0, chiB0, init_quat,init_orbphase, t_ref)
+        # print("Initializing with q, chiA0, chiB0, init_quat,init_orbphase, t_ref:")
+        # print(q, chiA0, chiB0, init_quat,init_orbphase, t_ref)
         y_of_t, i0 = self._initialize(q, chiA0, chiB0, init_quat,
                 init_orbphase, t_ref, normA, normB)
-        print("i0=", i0)
+        # print("i0=", i0)
 
         if i0 == 0:
             # Just gonna send it!
@@ -907,7 +905,7 @@ filename: The hdf5 file containing the surrogate data."
         Wrapper for self.dynamics_sur()
         """
         case_id = get_domain(q, chiA0[2], chiB0[2])
-        print("Sub-domain number {}".format(case_id))
+        # print("Sub-domain number {}".format(case_id))
         global q_fit_offset
         global q_fit_slope
         assert (q_fit_offset == q_fit_offsets[case_id]), "fit offset is not correct; it is {} and it should be {}".format(q_fit_offset, q_fit_offsets[case_id])
@@ -917,6 +915,16 @@ filename: The hdf5 file containing the surrogate data."
             = self.dynamics_sur_dict[case_id](q, chiA0, chiB0, init_orbphase=init_orbphase, \
             init_quat=init_quat, t_ref=t_ref, omega_ref=omega_ref)
         return quat_dyn, orbphase_dyn, chiA_copr_dyn, chiB_copr_dyn
+
+
+    def get_min_omega(q, chiA0, chiB0, init_quat=None, init_orbphase=0.0):
+        case_id = get_domain(q, chiA0[2], chiB0[2])
+
+        y0 = np.append(np.array([1., 0., 0., 0., init_orbphase]),
+                np.append(chiA0, chiB0))
+        if init_quat is not None:
+            y0[:4] = init_quat
+        return self.dynamics_sur_dict[case_id].get_omega(0, q, y0)
 
 
     def __call__(self, x, fM_low=None, fM_ref=None, dtM=None,
@@ -1016,7 +1024,7 @@ Returns:
 
         q, chiA0, chiB0 = x
         case_id = get_domain(q, chiA0[2], chiB0[2])
-        print("Sub-domain number {}".format(case_id))
+        # print("Sub-domain number {}".format(case_id))
         global q_fit_offset
         global q_fit_slope
         assert (q_fit_offset == q_fit_offsets[case_id]), "fit offset is not correct; it is {} and it should be {}".format(q_fit_offset, q_fit_offsets[case_id])
@@ -1117,6 +1125,7 @@ Returns:
 
         #  Transform and interpolate spins if needed
         if return_dynamics:
+            # print("I am returning dynamics")
 
             if do_interp:
                 ## Interpolate from self.tds_dict[case_id] to timesM because that is what
@@ -1132,12 +1141,11 @@ Returns:
             chiA_inertial = transformTimeDependentVector(quat, chiA_copr.T).T
             chiB_inertial = transformTimeDependentVector(quat, chiB_copr.T).T
 
-            dynamics = {
-                # FIXME: We are sending out copr spins now!
-                'chiA': chiA_inertial,
-                'chiB': chiB_inertial,
                 # 'chiA': chiA_copr,
                 # 'chiB': chiB_copr,
+            dynamics = {
+                'chiA': chiA_inertial,
+                'chiB': chiB_inertial,
                 'q_copr': quat,
                 'orbphase': orbphase,
                 }
@@ -1196,7 +1204,7 @@ q_fit_slope = None
 
 def get_domain(q, chi1z, chi2z):
     chi_eff = (q*chi1z + chi2z) / (q + 1.)
-    print("q, chi_eff: ", q, chi_eff)
+    # print("q, chi_eff: ", q, chi_eff)
     global q_fit_offset
     global q_fit_slope
     if q <= 2.:
