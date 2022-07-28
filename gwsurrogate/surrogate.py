@@ -2300,7 +2300,7 @@ In the __call__ method, x must have format x = [q, chi1, chi2].
 SURROGATE_CLASSES = {
     "NRHybSur3dq8": NRHybSur3dq8,
     "SEOBNRv4PHMSur": SEOBNRv4PHMSur,
-    "SEOBNRv4PHMSur_long": SEOBNRv4PHMSur80kM,
+    # "SEOBNRv4PHMSur_long": SEOBNRv4PHMSur80kM,
     "NRSur7dq4": NRSur7dq4,
     "NRHybSur3dq8Tidal": NRHybSur3dq8Tidal,
 #    "SpEC_q1_10_NoSpin_nu5thDegPoly_exclude_2_0.h5":EvaluateSurrogate # model SpEC_q1_10_NoSpin
