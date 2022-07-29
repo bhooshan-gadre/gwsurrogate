@@ -47,6 +47,7 @@ import os
 
 from .new import surrogate as new_surrogate
 from .new import precessing_surrogate
+from .new import seobnrv4phm_surrogate
 from . import catalog
 
 try:
