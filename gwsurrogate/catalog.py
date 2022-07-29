@@ -113,7 +113,7 @@ _surrogate_world['NRHybSur2dq15'] = \
   surrogate_info(\
   'https://zenodo.org/record/6726994/files/NRHybSur2dq15.h5',
   '''Surrogate model for aligned-spin binary black holes with mass ratios q<=15,
-  primary spin magnitudes <=0.5, and zero spin on secondary. 
+  primary spin magnitudes <=0.5, and zero spin on secondary.
   The model is trained on NR waveforms that have been
   hybridized using EOB/PN and spans the entire LIGO frequency band. This model
   is  presented in arxiv:2203.10109. Available modes are
@@ -165,6 +165,30 @@ _surrogate_world['EMRISur1dq1e4'] = \
   '''https://arxiv.org/abs/1910.10473''',
   'd145958484738e0c7292e084a66a96fa')
 
+_surrogate_world['SEOBNRv4PHMSur'] = \
+    surrogate_info(\
+    'SEOBNRv4PHMSur.h5',
+        '''Do not have zendo record yet''',
+        '''Surrogate model for the time domain precessing EOB waveform model
+        SEOBNRv4PHM (). The model is valid for mass ratio <= 20 and spin
+        magnitudes upto 0.8. Extrapolation for spins works reasonably well till
+        0.9 and maybe till 0.95 for q < 5. The model has (2,2), (2,1), (3,3),
+        (4,4) and (5,5) modes in coorbital frame. So one can choose ellMax <=5
+        for inertial frame waveforms. Surrogate is 5000M long.''',
+         '2ce450b06ca29d24d538dc86e81a31d4')
+
+_surrogate_world['SEOBNRv4PHMSur_long'] = \
+    surrogate_info(\
+    'SEOBNRv4PHMSur80kM.h5',
+        '''Do not have zendo record yet''',
+        '''Surrogate model for the time domain precessing EOB waveform model
+        SEOBNRv4PHM (). The model is valid for mass ratio <= 2 and spin
+        magnitudes upto 0.8. Extrapolation for spins have not been tested.
+        The model has (2,2), (2,1), (3,3), (4,4) and (5,5) modes in coorbital
+        frame. So one can choose ellMax <=5 for inertial frame waveforms.
+        Surrogate is 80000M long. This similar to SEOBNRv4PHMSur.''',
+         'a09b744db1787c7800fadb74312385de')
+
 # TODO: test function, and then use it whenever a file is loaded
 def is_file_recent(filename):
   """ Check local hdf5 file's hash against most recent one on Zenodo. """
@@ -192,6 +216,8 @@ def is_file_recent(filename):
     #raise AttributeError("%s out of date.\n Please download the current version"%filename)
   else:
     return True
+
+
 
 def download_path():
   """return the default path for downloaded surrogates"""
